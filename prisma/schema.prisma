@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id             String  @id @default(uuid())
+  is_super_admin Boolean
+  name           String
+  username       String  @unique
+  email          String?
+  password       String
+  external_id    String?
+}
+
+model Plan {
+  id         String  @id @default(uuid())
+  pgsql      Boolean @default(false) // Se postgresql está habilitado
+  mysql      Boolean @default(false) // Se mysql está habilitado
+  mongodb    Boolean @default(false)
+  storage    Int     @default(0) // Limite de armazenamento da conta, 0 is unlimited
+  bandwith   Int     @default(0) // Limite de transferencia em mb, 0 is unlimited
+  containers Int     @default(0) // Limite de containers, 0 is unlimited
+  ram        Int     @default(0) // Limite de memoria ram para o usuario em mb, 0 is unlimited
+  cpu        Int     @default(0) // Limite de cpu (100 = 1vcpu), 0 is unlimited
+  domains    Int     @default(0) // Limite de domínios na conta
+  cron       Int     @default(0) // Limite de cron
+
+  users User[]
+}
+
+model User {
+  id          String  @id
+  plan_id     String
+  username    String
+  password    String
+  email       String?
+  external_id String?
+  env         Json    @default("{}")
+
+  plan       Plan        @relation(fields: [plan_id], references: [id])
+  containers Container[]
+  domains    Domain[]
+}
+
+model Container {
+  id      String @id @default(uuid())
+  user_id String
+  image   String @default("node")
+  name    String
+  env     Json   @default("{}")
+
+  user    User     @relation(fields: [user_id], references: [id])
+  domains Domain[]
+  crons   Cron[]
+}
+
+enum Protocol {
+  HTTP
+  HTTPS
+}
+
+model Domain {
+  id            String   @id @default(uuid())
+  user_id       String
+  container_id  String? // Container na qual está conectado
+  domain        String   @unique
+  protocol_to   Protocol @default(HTTP)
+  port_to       Int? // Porta na qual está conectado
+  path_from     String   @default("/") // Path na qual está recendo a conexão
+  path_to       String   @default("/") // Path na qual está conectado
+  ssl_cert_path String?
+  ssl_key_path  String? // usa padrao se não encontrar
+
+  user      User       @relation(fields: [user_id], references: [id])
+  container Container? @relation(fields: [container_id], references: [id])
+}
+
+model Cron {
+  id           String  @id @default(uuid())
+  container_id String
+  enable       Boolean @default(true)
+  cron_time    String
+  exec_command String
+
+  container Container? @relation(fields: [container_id], references: [id])
+}
